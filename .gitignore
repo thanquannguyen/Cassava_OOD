@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.zip
+*.tar.gz
+data/cifar-10-batches-py/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Env
+venv/
+env/
+ENV/
+.env
+.venv
+
+# IDE
+.vscode/
+.idea/
+
+# Checkpoints (Tracked by LFS, but ignore temp ones if any)
+# checkpoints/
+
+# Logs
+logs/
+*.log
+
+# System
+.DS_Store
+Thumbs.db
