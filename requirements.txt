@@ -4,6 +4,10 @@ opencv-python
 scikit-learn
 matplotlib
 seaborn
+paho-mqtt
+flask
+flask-socketio
+eventlet
 pandas
 numpy
 tqdm

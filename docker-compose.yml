@@ -1,0 +1,16 @@
+version: '2.3'
+
+services:
+  cassava-inference:
+    build: .
+    image: cassava-ood:latest
+    container_name: cassava_inference
+    runtime: nvidia
+    network_mode: host
+    privileged: true
+    devices:
+      - /dev/video0:/dev/video0
+    volumes:
+      - ./checkpoints:/app/checkpoints
+    command: python3 inference.py --camera_id 0 --mqtt_broker broker.hivemq.com
+    restart: unless-stopped
