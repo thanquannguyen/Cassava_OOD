@@ -2,9 +2,13 @@
 FROM nvcr.io/nvidia/l4t-pytorch:r32.7.1-pth1.10-py3
 
 # Install system dependencies (OpenCV requires these)
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Fix: Remove broken kitware repo from sources.list (it's not in sources.list.d)
+RUN sed -i '/kitware/d' /etc/apt/sources.list && \
+    rm -rf /etc/apt/sources.list.d/kitware* && \
+    apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
+    python3-opencv \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -19,8 +23,9 @@ RUN pip3 install --upgrade pip
 # Here we copy requirements.txt and install.
 COPY requirements.txt .
 
-# We filter out torch/torchvision from requirements.txt to avoid pip trying to download x86 wheels or compiling from source
-RUN grep -v "torch" requirements.txt > requirements_jetson.txt && \
+# We filter out torch/torchvision AND opencv-python from requirements.txt 
+# Reason: torch is in base image; opencv-python fails to build on ARM, so we use python3-opencv from apt above
+RUN grep -v "torch" requirements.txt | grep -v "opencv-python" > requirements_jetson.txt && \
     pip3 install -r requirements_jetson.txt
 
 # Copy source code

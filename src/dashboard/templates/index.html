@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,63 +9,132 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
-        body { background-color: #f8f9fa; }
-        .card { margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .status-indicator { width: 20px; height: 20px; border-radius: 50%; display: inline-block; margin-right: 10px; }
-        #alert-log { max-height: 300px; overflow-y: auto; }
+        body {
+            background-color: #f8f9fa;
+        }
+
+        .card {
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .status-indicator {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 10px;
+        }
+
+        #alert-log {
+            max-height: 300px;
+            overflow-y: auto;
+        }
     </style>
 </head>
+
 <body>
     <nav class="navbar navbar-dark bg-dark">
         <div class="container-fluid">
-            <span class="navbar-brand mb-0 h1">🌿 Cassava OOD Detection Dashboard</span>
-            <span class="navbar-text text-light" id="connection-status">Disconnected</span>
+            <span class="navbar-brand mb-0 h1">🌿 Cassava OOD Control Station</span>
+            <span class="navbar-text text-light">
+                <span id="server-status" class="badge bg-secondary me-1">Server: Disconnected</span>
+                <span id="device-status" class="badge bg-danger">Device: Offline</span>
+            </span>
         </div>
     </nav>
 
-    <div class="container mt-4">
-        <!-- Status Cards -->
+    <div class="container-fluid mt-3">
         <div class="row">
-            <div class="col-md-4">
-                <div class="card text-center">
-                    <div class="card-header">Prediction</div>
-                    <div class="card-body">
-                        <h2 class="card-title" id="label">--</h2>
-                        <p class="card-text">Confidence: <span id="confidence">--</span></p>
+            <!-- LEFT: Live View -->
+            <div class="col-md-6">
+                <div class="card mb-3">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span id="path-display">Path: --</span>
+                        <div>
+                            <span id="system-status" class="badge bg-secondary me-2">STOPPED</span>
+                            <button class="btn btn-sm btn-outline-warning" onclick="resetROI()">Reset ROI</button>
+                        </div>
+                    </div>
+                    <div class="card-body p-0 position-relative"
+                        style="background: black; height: 500px; display: flex; align-items: center; justify-content: center;">
+                        <img id="live-image" style="max-width: 100%; max-height: 100%; display: block;" />
+                        <canvas id="roi-canvas"
+                            style="position: absolute; top: 0; left: 0; cursor: crosshair; touch-action: none;"></canvas>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="card text-center">
-                    <div class="card-header">System Status</div>
+
+            <!-- RIGHT: Controls & Data -->
+            <div class="col-md-6">
+                <!-- Control & Config -->
+                <div class="card mb-3">
+                    <div class="card-header">Control Panel</div>
                     <div class="card-body">
-                        <h2 class="card-title">
-                            <span id="status-dot" class="status-indicator bg-secondary"></span>
-                            <span id="status-text">Waiting</span>
-                        </h2>
-                        <p class="card-text">Energy: <span id="energy">--</span></p>
+                        <div class="row g-3 align-items-center mb-3">
+                            <div class="col-auto">
+                                <button id="btn-start" class="btn btn-success w-100" onclick="sendCommand('start')">▶
+                                    START</button>
+                            </div>
+                            <div class="col-auto">
+                                <button id="btn-stop" class="btn btn-danger w-100" onclick="sendCommand('stop')">⏹
+                                    STOP</button>
+                            </div>
+                            <div class="col">
+                                <small class="text-muted d-block">Current Action</small>
+                                <strong id="current-action">Waiting for command...</strong>
+                            </div>
+                        </div>
+                        <hr>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Energy Threshold</label>
+                                <div class="input-group">
+                                    <input type="number" id="cfg-threshold" class="form-control" value="-5.0"
+                                        step="0.1">
+                                    <button class="btn btn-outline-primary" onclick="updateConfig()">Set</button>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Delay (sec)</label>
+                                <div class="input-group">
+                                    <input type="number" id="cfg-delay" class="form-control" value="2.0" step="0.5">
+                                    <button class="btn btn-outline-primary" onclick="updateConfig()">Set</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-header">OOD Alerts</div>
-                    <div class="card-body p-0">
-                        <ul class="list-group list-group-flush" id="alert-log">
-                            <li class="list-group-item text-muted">No alerts yet...</li>
-                        </ul>
+
+                <!-- Results Table -->
+                <div class="card" style="height: 350px;">
+                    <div class="card-header">Detection History (Click to Review)</div>
+                    <div class="card-body p-0 table-responsive">
+                        <table class="table table-hover table-sm table-striped">
+                            <thead class="table-dark sticky-top">
+                                <tr>
+                                    <th>Filename</th>
+                                    <th>Result</th>
+                                    <th>Energy</th>
+                                    <th>Conf</th>
+                                </tr>
+                            </thead>
+                            <tbody id="result-table-body">
+                                <!-- JS will populate -->
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Chart -->
+        <!-- Chart (Below) -->
         <div class="row">
             <div class="col-12">
                 <div class="card">
                     <div class="card-header">Real-time Energy Score</div>
                     <div class="card-body">
-                        <canvas id="energyChart" height="100"></canvas>
+                        <canvas id="energyChart" height="50"></canvas>
                     </div>
                 </div>
             </div>
@@ -73,11 +143,177 @@
 
     <script>
         const socket = io();
-        const maxDataPoints = 50;
-        
-        // Chart Setup
-        const ctx = document.getElementById('energyChart').getContext('2d');
-        const energyChart = new Chart(ctx, {
+
+        // --- UI Elements ---
+        const btnStart = document.getElementById('btn-start');
+        const btnStop = document.getElementById('btn-stop');
+        const sysStatus = document.getElementById('system-status');
+        const serverStatus = document.getElementById('server-status');
+        const deviceStatus = document.getElementById('device-status');
+        const tableBody = document.getElementById('result-table-body');
+
+        let deviceTimeout;
+
+        // --- Socket Events ---
+        socket.on('connect', () => {
+            serverStatus.innerText = 'Server: Connected';
+            serverStatus.className = 'badge bg-success me-1';
+        });
+
+        socket.on('disconnect', () => {
+            serverStatus.innerText = 'Server: Disconnected';
+            serverStatus.className = 'badge bg-danger me-1';
+            setDeviceOffline();
+        });
+
+        socket.on('update_data', (data) => {
+            // Device is Alive
+            if (deviceStatus.innerText !== 'Device: Online') {
+                deviceStatus.innerText = 'Device: Online';
+                deviceStatus.className = 'badge bg-success';
+            }
+
+            // Reset Watchdog (10s timeout)
+            clearTimeout(deviceTimeout);
+            deviceTimeout = setTimeout(setDeviceOffline, 10000);
+
+            // Update Image
+            if (data.image) {
+                const img = document.getElementById('live-image');
+                img.src = "data:image/jpeg;base64," + data.image;
+            }
+
+            // Update Status Info
+            if (data.path) document.getElementById('path-display').innerText = "Path: " + data.path;
+
+            // Add to Table (Prepend)
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${data.filename || '--'}</td>
+                <td style="color: ${data.status === 'BLOCK (OOD)' ? 'red' : 'green'}"><b>${data.label}</b><br><small>${data.status}</small></td>
+                <td><b>${data.energy.toFixed(2)}</b></td>
+                <td>${(data.confidence * 100).toFixed(0)}%</td>
+            `;
+            row.style.cursor = "pointer";
+            row.onclick = () => selectImage(data.filename);
+
+            tableBody.prepend(row);
+
+            // Keep table size manageable
+            if (tableBody.children.length > 50) tableBody.lastChild.remove();
+
+            // Update Chart
+            if (energyChart) {
+                const now = new Date().toLocaleTimeString();
+                energyChart.data.labels.push(now);
+                energyChart.data.datasets[0].data.push(data.energy);
+
+                if (energyChart.data.labels.length > 50) {
+                    energyChart.data.labels.shift();
+                    energyChart.data.datasets[0].data.shift();
+                }
+                energyChart.update();
+            }
+        });
+
+        // --- Control Logic ---
+        function sendCommand(cmd) {
+            socket.emit('control', { cmd: cmd });
+            if (cmd === 'start') {
+                sysStatus.innerText = "RUNNING";
+                sysStatus.className = "badge bg-success";
+                document.getElementById('current-action').innerText = "System Running...";
+            } else {
+                sysStatus.innerText = "STOPPED";
+                sysStatus.className = "badge bg-danger";
+                document.getElementById('current-action').innerText = "System Stopped. Ready to Review.";
+            }
+        }
+
+        function updateConfig() {
+            const t = parseFloat(document.getElementById('cfg-threshold').value);
+            const d = parseFloat(document.getElementById('cfg-delay').value);
+            socket.emit('config', { threshold: t, delay: d });
+            alert("Configuration Sent!");
+        }
+
+        function selectImage(filename) {
+            console.log("Selecting image:", filename);
+            socket.emit('control', { cmd: 'load_image', path: filename });
+            document.getElementById('current-action').innerText = "Reviewing: " + filename;
+        }
+
+        // --- Canvas & ROI Logic ---
+        const img = document.getElementById('live-image');
+        const canvas = document.getElementById('roi-canvas');
+        const ctx = canvas.getContext('2d');
+        let isDrawing = false;
+        let startX, startY;
+
+        img.onload = function () {
+            canvas.width = img.clientWidth;
+            canvas.height = img.clientHeight;
+            canvas.style.top = img.offsetTop + "px";
+            canvas.style.left = img.offsetLeft + "px";
+        };
+
+        function getMousePos(evt) {
+            const rect = canvas.getBoundingClientRect();
+            return { x: evt.clientX - rect.left, y: evt.clientY - rect.top };
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            const pos = getMousePos(e);
+            startX = pos.x; startY = pos.y;
+            isDrawing = true;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isDrawing) return;
+            const pos = getMousePos(e);
+            const w = pos.x - startX; const h = pos.y - startY;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = '#00FF00';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(startX, startY, w, h);
+        });
+
+        canvas.addEventListener('mouseup', (e) => {
+            if (!isDrawing) return;
+            isDrawing = false;
+            const pos = getMousePos(e);
+            let w = pos.x - startX; let h = pos.y - startY;
+
+            let x = startX; let y = startY;
+            if (w < 0) { x = x + w; w = Math.abs(w); }
+            if (h < 0) { y = y + h; h = Math.abs(h); }
+
+            if (w > 5 && h > 5) {
+                const roi = {
+                    x: x / canvas.width, y: y / canvas.height,
+                    w: w / canvas.width, h: h / canvas.height
+                };
+                socket.emit('update_roi', roi);
+            }
+        });
+
+        function setDeviceOffline() {
+            const deviceStatus = document.getElementById('device-status');
+            if (deviceStatus) {
+                deviceStatus.innerText = 'Device: Offline';
+                deviceStatus.className = 'badge bg-danger';
+            }
+        }
+
+        function resetROI() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            socket.emit('update_roi', null);
+        }
+
+        // --- Chart Setup (Moved to end to ensure canvas exists) ---
+        const chartCtx = document.getElementById('energyChart').getContext('2d');
+        const energyChart = new Chart(chartCtx, {
             type: 'line',
             data: {
                 labels: [],
@@ -94,60 +330,10 @@
                 scales: {
                     y: { beginAtZero: false }
                 },
-                animation: { duration: 0 } // Disable animation for performance
+                animation: { duration: 0 }
             }
-        });
-
-        socket.on('connect', () => {
-            document.getElementById('connection-status').innerText = 'Connected';
-            document.getElementById('connection-status').classList.add('text-success');
-        });
-
-        socket.on('disconnect', () => {
-            document.getElementById('connection-status').innerText = 'Disconnected';
-            document.getElementById('connection-status').classList.remove('text-success');
-        });
-
-        socket.on('update_data', (data) => {
-            // Update Text
-            document.getElementById('label').innerText = data.label;
-            document.getElementById('confidence').innerText = (data.confidence * 100).toFixed(1) + '%';
-            document.getElementById('energy').innerText = data.energy.toFixed(2);
-            document.getElementById('status-text').innerText = data.status;
-
-            // Update Status Dot Color
-            const dot = document.getElementById('status-dot');
-            dot.style.backgroundColor = `rgb(${data.color[2]}, ${data.color[1]}, ${data.color[0]})`; // OpenCV uses BGR, CSS uses RGB. Wait, inference.py sends BGR?
-            // Let's check inference.py. It sends `color` tuple. OpenCV default is BGR. 
-            // In inference.py: color = (0, 255, 0) # Green. This is BGR in OpenCV but usually (R, G, B) in Python logic unless explicitly cv2.
-            // Actually in inference.py: `color = (0, 255, 0)` -> Green. `color = (0, 0, 255)` -> Red.
-            // If I use these directly in CSS rgb(), (0, 0, 255) is Blue. (0, 255, 0) is Green.
-            // So Red (OOD) in inference.py is (0, 0, 255). In CSS that is Blue.
-            // I should fix this in JS or Python. 
-            // Let's assume inference.py sends (B, G, R) because it uses it for cv2.putText.
-            // So for CSS, I should swap B and R.
-            // data.color is [B, G, R]. CSS needs rgb(R, G, B).
-            dot.style.backgroundColor = `rgb(${data.color[2]}, ${data.color[1]}, ${data.color[0]})`;
-
-            // Update Chart
-            const now = new Date().toLocaleTimeString();
-            energyChart.data.labels.push(now);
-            energyChart.data.datasets[0].data.push(data.energy);
-
-            if (energyChart.data.labels.length > maxDataPoints) {
-                energyChart.data.labels.shift();
-                energyChart.data.datasets[0].data.shift();
-            }
-            energyChart.update();
-        });
-
-        socket.on('alert', (data) => {
-            const log = document.getElementById('alert-log');
-            const item = document.createElement('li');
-            item.className = 'list-group-item list-group-item-danger';
-            item.innerText = `${new Date().toLocaleTimeString()} - ${data.message} (E=${data.energy.toFixed(2)})`;
-            log.prepend(item);
         });
     </script>
 </body>
+
 </html>

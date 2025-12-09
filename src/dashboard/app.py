@@ -16,6 +16,7 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 MQTT_BROKER = "broker.hivemq.com"
 MQTT_PORT = 1883
 MQTT_TOPIC = "cassava/#"
+mqtt_client = None  # Global client instance
 
 # Global variables to store latest state
 current_state = {
@@ -50,20 +51,41 @@ def on_message(client, userdata, msg):
 
 # Start MQTT Client in a background thread
 def start_mqtt():
-    client = mqtt.Client()
-    client.on_connect = on_connect
-    client.on_message = on_message
+    global mqtt_client
+    mqtt_client = mqtt.Client()
+    mqtt_client.on_connect = on_connect
+    mqtt_client.on_message = on_message
     
     print(f"[Dashboard] Connecting to {MQTT_BROKER}...")
     try:
-        client.connect(MQTT_BROKER, MQTT_PORT, 60)
-        client.loop_start()
+        mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
+        mqtt_client.loop_start()
     except Exception as e:
         print(f"[Dashboard] MQTT Connection Failed: {e}")
 
 @app.route('/')
 def index():
     return render_template('index.html', initial_state=current_state)
+
+@socketio.on('update_roi')
+def handle_roi_update(roi_data):
+    if mqtt_client:
+        payload = json.dumps(roi_data) if roi_data else "{}"
+        mqtt_client.publish("cassava/roi", payload)
+
+@socketio.on('config')
+def handle_config(data):
+    # data: {threshold: float, delay: float}
+    print(f"[Dashboard] Config Update: {data}")
+    if mqtt_client:
+        mqtt_client.publish("cassava/config", json.dumps(data))
+
+@socketio.on('control')
+def handle_control(data):
+    # data: {cmd: "start"|"stop"|"load_image", path: "..."}
+    print(f"[Dashboard] Control Command: {data}")
+    if mqtt_client:
+        mqtt_client.publish("cassava/control", json.dumps(data))
 
 if __name__ == '__main__':
     start_mqtt()
