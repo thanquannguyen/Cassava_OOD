@@ -14,6 +14,9 @@ class MQTTClient:
         # Callbacks
         self.client.on_connect = self.on_connect
         self.client.on_disconnect = self.on_disconnect
+        self.client.on_message = self.on_message
+        
+        self.message_handlers = {}
         
         # Start background loop
         self.start()
@@ -30,9 +33,33 @@ class MQTTClient:
         if rc == 0:
             print(f"[MQTT] Connected to {self.broker}")
             self.connected = True
+            # Resubscribe to topics
+            for subtopic in self.message_handlers:
+                topic = f"{self.topic_prefix}/{subtopic}"
+                client.subscribe(topic)
+                print(f"[MQTT] Subscribed to {topic}")
         else:
             print(f"[MQTT] Failed to connect, return code {rc}")
             self.connected = False
+
+    def on_message(self, client, userdata, msg):
+        try:
+            # Extract subtopic (remove prefix)
+            topic = msg.topic
+            if topic.startswith(f"{self.topic_prefix}/"):
+                subtopic = topic[len(self.topic_prefix)+1:]
+                if subtopic in self.message_handlers:
+                    payload = json.loads(msg.payload.decode())
+                    self.message_handlers[subtopic](payload)
+        except Exception as e:
+            print(f"[MQTT] Error handling message: {e}")
+
+    def subscribe(self, subtopic, callback):
+        self.message_handlers[subtopic] = callback
+        if self.connected:
+            topic = f"{self.topic_prefix}/{subtopic}"
+            self.client.subscribe(topic)
+            print(f"[MQTT] Subscribed to {topic}")
 
     def on_disconnect(self, client, userdata, rc):
         print(f"[MQTT] Disconnected (rc={rc})")

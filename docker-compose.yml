@@ -11,6 +11,8 @@ services:
     devices:
       - /dev/video0:/dev/video0
     volumes:
+      - .:/app
       - ./checkpoints:/app/checkpoints
+      - ./torch_cache:/root/.cache/torch
     command: python3 inference.py --camera_id 0 --mqtt_broker broker.hivemq.com
     restart: unless-stopped
