@@ -47,10 +47,19 @@ class OODDetector:
         self.model = CassavaMobileNet(num_classes=5, pretrained=False).to(self.device)
         
         # Check for Robust Model first
-        robust_path = model_path.replace(".pth", "_robust.pth")
-        if os.path.exists(robust_path):
-            print(f"--> Found ROBUST model: {robust_path}. Loading...", flush=True)
-            self.model.load_state_dict(torch.load(robust_path, map_location=self.device))
+        # Check for Robust Model explicitly
+        robust_path_explicit = "checkpoints/cassava_mobilenet_v3_robust.pth"
+        robust_path_derived = model_path.replace(".pth", "_robust.pth")
+        
+        final_model_path = None
+        if os.path.exists(robust_path_explicit):
+             final_model_path = robust_path_explicit
+        elif os.path.exists(robust_path_derived):
+             final_model_path = robust_path_derived
+             
+        if final_model_path:
+            print(f"--> Found ROBUST model: {final_model_path}. Loading...", flush=True)
+            self.model.load_state_dict(torch.load(final_model_path, map_location=self.device))
         else:
             print(f"--> Loading standard model: {model_path}", flush=True)
             self.model.load_state_dict(torch.load(model_path, map_location=self.device))
@@ -60,7 +69,7 @@ class OODDetector:
         
         # Load Calibration Params
         self.T = 1.0
-        self.threshold = -20.0
+        self.threshold = 3.0 # Updated: Empirical sweet spot (Cassava < 2.0, Flowers > 3.8)
         if os.path.exists(calibration_file):
             with open(calibration_file, 'r') as f:
                 lines = f.readlines()
